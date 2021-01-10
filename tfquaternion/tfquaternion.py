@@ -25,9 +25,11 @@ import tensorflow as tf
 #                     Quaternion module functions
 def scope_wrapper(func, *args, **kwargs):
     """Create a tf name scope around the function with its name."""
+
     def scoped_func(*args, **kwargs):
         with tf.name_scope("quaternion_{}".format(func.__name__)):
             return func(*args, **kwargs)
+
     return scoped_func
 
 
@@ -163,8 +165,8 @@ def rotate_vector_by_quaternion(q, v, q_ndims=None, v_ndims=None):
         v = tf.expand_dims(v, axis=0) + tf.zeros_like(q_xyz)
     q_xyz += tf.zeros_like(v)
     v += tf.zeros_like(q_xyz)
-    t = 2 * tf.cross(q_xyz, v)
-    return v + tf.expand_dims(w, axis=-1) * t + tf.cross(q_xyz, t)
+    t = 2 * tf.linalg.cross(q_xyz, v)
+    return v + tf.expand_dims(w, axis=-1) * t + tf.linalg.cross(q_xyz, t)
 
 
 # ____________________________________________________________________________
@@ -280,9 +282,11 @@ class Quaternion(object):
         return tf.divide(self._q, tf.convert_to_tensor(other))
 
     def __rdiv__(self, other):
-        if (isinstance(other, Quaternion) or
-                tf.convert_to_tensor(other).shape == () or
-                tf.convert_to_tensor(other).shape[-1] == 1):  # scalar
+        if (
+            isinstance(other, Quaternion)
+            or tf.convert_to_tensor(other).shape == ()
+            or tf.convert_to_tensor(other).shape[-1] == 1
+        ):  # scalar
             return quaternion_divide(other, self)
         return tf.divide(tf.convert_to_tensor(other), self._q)
 
@@ -315,8 +319,9 @@ class Quaternion(object):
         return tf.greater_equal(self._q, other)
 
     def __repr__(self):
-        return "<tfq.Quaternion '{}' ({})>".format(self.name,
-                                                   self._q.__repr__()[1:-1])
+        return "<tfq.Quaternion '{}' ({})>".format(
+            self.name, self._q.__repr__()[1:-1]
+        )
 
     @scope_wrapper
     def conjugate(self):
@@ -362,16 +367,20 @@ class Quaternion(object):
             return 2 * a * b - 2 * c * d
 
         w, x, y, z = tf.unstack(self.normalized().value(), num=4, axis=-1)
-        m = [[diag(y, z), tr_sub(x, y, z, w), tr_add(x, z, y, w)],
-             [tr_add(x, y, z, w), diag(x, z), tr_sub(y, z, x, w)],
-             [tr_sub(x, z, y, w), tr_add(y, z, x, w), diag(x, y)]]
+        m = [
+            [diag(y, z), tr_sub(x, y, z, w), tr_add(x, z, y, w)],
+            [tr_add(x, y, z, w), diag(x, z), tr_sub(y, z, x, w)],
+            [tr_sub(x, z, y, w), tr_add(y, z, x, w), diag(x, y)],
+        ]
         return tf.stack([tf.stack(m[i], axis=-1) for i in range(3)], axis=-2)
 
     @staticmethod
     def validate_shape(x):
         """Raise a value error if x.shape ist not (..., 4)."""
-        error_msg = ("Can't create a quaternion from a tensor with shape {}."
-                     "The last dimension must be 4.")
+        error_msg = (
+            "Can't create a quaternion from a tensor with shape {}."
+            "The last dimension must be 4."
+        )
         # Check is performed during graph construction. If your dimension
         # is unknown, tf.reshape(x, (-1, 4)) might work.
         if x.shape[-1] != 4:
@@ -402,5 +411,6 @@ def quaternion_to_tensor(x, dtype=None, name=None, as_ref=None):
     return tf.convert_to_tensor(x.value(), dtype, name)
 
 
-tf.register_tensor_conversion_function(Quaternion, quaternion_to_tensor,
-                                       priority=100)
+tf.register_tensor_conversion_function(
+    Quaternion, quaternion_to_tensor, priority=100
+)
